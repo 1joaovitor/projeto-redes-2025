@@ -1,0 +1,19 @@
+Como Usar Suas Novas Tarefas
+Para Compilar o Projeto (Build):
+
+Sempre que você precisar recompilar o projeto (o que não é necessário a cada execução), basta pressionar o atalho:
+Ctrl + Shift + B
+
+Um terminal se abrirá e executará o comando ./ns3 build.
+
+Para Executar sua Simulação:
+
+Abra o arquivo de simulação que você quer rodar (por exemplo, equipe_x_2s2025.cc dentro da pasta scratch).
+
+Pressione Ctrl + Shift + P para abrir a paleta de comandos.
+
+Digite Tasks: Run Task.
+
+Selecione a tarefa com o nome run simulation na lista.
+
+O VS Code abrirá um novo terminal e executará sua simulação, mostrando o resultado na tela.
