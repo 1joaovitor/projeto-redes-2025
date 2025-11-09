@@ -16,4 +16,4 @@ Digite Tasks: Run Task.
 
 Selecione a tarefa com o nome run simulation na lista.
 
-O VS Code abrirá um novo terminal e executará sua simulação, mostrando o resultado na tela.
+O VS Code abrirá um novo terminal e executará sua simulação, mostrando o resultado na tela. 

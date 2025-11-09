@@ -970,6 +970,7 @@
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/examples/wireless/CMakeFiles/install.dir
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/examples/wireless/CMakeFiles/install/local.dir
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/examples/wireless/CMakeFiles/install/strip.dir
+/home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/scratch/CMakeFiles/scratch_equipe_1_.2s2025.dir
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/scratch/CMakeFiles/scratch_scratch-simulator.dir
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/scratch/CMakeFiles/scratch_subdir_scratch-subdir.dir
 /home/joaov/ns-allinone-3.43/ns-3.43/cmake-cache/scratch/CMakeFiles/edit_cache.dir

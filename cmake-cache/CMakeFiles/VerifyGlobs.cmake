@@ -6,6 +6,7 @@ cmake_policy(SET CMP0009 NEW)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/**")
 set(OLD_GLOB
   "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/CMakeLists.txt"
+  "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/equipe_1_.2s2025.cc"
   "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/nested-subdir"
   "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/scratch-simulator.cc"
   "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/subdir"
@@ -18,6 +19,7 @@ endif()
 # single_source_file_scratches at scratch/CMakeLists.txt:77 (file)
 file(GLOB NEW_GLOB LIST_DIRECTORIES true "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/[^.]*.cc")
 set(OLD_GLOB
+  "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/equipe_1_.2s2025.cc"
   "/home/joaov/ns-allinone-3.43/ns-3.43/scratch/scratch-simulator.cc"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")

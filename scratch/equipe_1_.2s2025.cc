@@ -34,13 +34,14 @@ using namespace ns3;
 
 int main(int argc, char *argv[])
 {
-    std::string protocolo = "TCP"; // Protocolo TCP, UDP ou Mixed
+    std::string protocolo = "UDP"; // Protocolo TCP, UDP ou Mixed
     uint32_t nSta = 4; // Numero de clientes Wifi
     std::string dataRate = "100Mbps"; // Taxa de dados
     std::string delay = "2ms"; // Atraso do enlace
 
     CommandLine cmd; 
     cmd.AddValue("nSta", "Number of WiFi clients", nSta );
+    cmd.AddValue("protocolo", "Protocolo a ser usado (TCP, UDP, Mixed)", protocolo);
     cmd.Parse(argc, argv);
 
     NodeContainer lan; lan.Create(3);       // 0:s2, 1:s1, 2:s0
@@ -110,6 +111,9 @@ int main(int argc, char *argv[])
             "ActiveProbing", BooleanValue(false));
     NetDeviceContainer staDevs = wifi.Install(phy, mac, wifiStaNodes);
 
+    // Zniffer no Wi-Fi para debug 
+    phy.EnablePcap("wifi-clients", staDevs);
+
     // AP (s0)
     mac.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid));
     NetDeviceContainer apDevs  = wifi.Install(phy, mac, wifiApNode);
@@ -124,14 +128,127 @@ int main(int argc, char *argv[])
 
     Ipv4Address s2Addr = csmaIfaces.GetAddress(0); // Endereco IP do servidor s2
     std::cout << "Server s2 IP Address: " << s2Addr << std::endl;
+    
+    /*
+     
+    SEÇÃO DE APLICAÇÃO (TCP/UDP/Mixed)
+    
+    */ 
+
+    // Definição das portas de cada protocolo
+    uint16_t portTcp = 9;   // padrão para o "PacketSink" (TCP)
+    uint16_t portUdp = 10; // Echo (UDP)
+
+    // Containers para guardar as aplicações (para poder iniciá-las/pará-las)
+    ApplicationContainer serverApps;
+    ApplicationContainer clientApps;
+
+    if (protocolo == "TCP")
+    {
+        std::cout << "Iniciando cenário TCP" << std::endl;
+        
+        // Servidor (nó s2)
+        // Instala o "PacketSink" (receptor TCP) no nó s2 (lan.Get(0))
+        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), portTcp));
+        serverApps.Add(sinkHelper.Install(lan.Get(0)));
+
+        // Clientes (nós c0...cn)
+        // Instala o "BulkSend" (emissor TCP) em todos os clientes
+        BulkSendHelper bulkHelper("ns3::TcpSocketFactory", InetSocketAddress(s2Addr, portTcp));
+        
+        // Enviar o máximo de dados possível (0 = ilimitado)
+        bulkHelper.SetAttribute("MaxBytes", UintegerValue(0));
+
+        for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+        {
+            clientApps.Add(bulkHelper.Install(wifiStaNodes.Get(i)));
+        }
+    }
+    else if (protocolo == "UDP")
+    {
+        std::cout << "Iniciando cenário UDP" << std::endl;
+
+        // Servidor (no nó s2)
+        // Instala o "UdpEchoServer" no s2
+        UdpEchoServerHelper echoServerHelper(portUdp);
+        serverApps.Add(echoServerHelper.Install(lan.Get(0)));
+
+        // Clientes (nos nós c0...cn) ---
+        // Instala o "UdpEchoClient" 
+        UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
+        
+        // Configura o cliente UDP: 1 pacote a cada 0.01s (simulando tráfego)
+        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(1000)); // N° de pacotes
+        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.01))); // Intervalo
+        echoClientHelper.SetAttribute("PacketSize", UintegerValue(1024)); // Tamanho
+
+        for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+        {
+            clientApps.Add(echoClientHelper.Install(wifiStaNodes.Get(i)));
+        }
+    }
+    else if (protocolo == "Mixed")
+    {
+        std::cout << "Iniciando cenário Misto (50% TCP, 50% UDP)" << std::endl;
+
+        // Servidor (s2)
+        // O servidor precisa rodar os DOIS serviços ao mesmo tempo
+        
+        // Servidor TCP (PacketSink)
+        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), portTcp));
+        serverApps.Add(sinkHelper.Install(lan.Get(0)));
+        
+        // Servidor UDP (UdpEcho)
+        UdpEchoServerHelper echoServerHelper(portUdp);
+        serverApps.Add(echoServerHelper.Install(lan.Get(0)));
+
+        // Clientes (c0...cn)
+        // Metade vai usar TCP, metade vai usar UDP
+        
+        // Clientes TCP (BulkSend)
+        BulkSendHelper bulkHelper("ns3::TcpSocketFactory", InetSocketAddress(s2Addr, portTcp));
+        bulkHelper.SetAttribute("MaxBytes", UintegerValue(0));
+
+        // Clientes UDP (UdpEcho), mesmos valores do teste exclusivo UDP
+        UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
+        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(1000));
+        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.01)));
+        echoClientHelper.SetAttribute("PacketSize", UintegerValue(1024));
+        
+        for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+        {
+            if (i < wifiStaNodes.GetN() / 2) // Primeira metade
+            {
+                clientApps.Add(bulkHelper.Install(wifiStaNodes.Get(i)));
+            }
+            else // Segunda metade
+            {
+                clientApps.Add(echoClientHelper.Install(wifiStaNodes.Get(i)));
+            }
+        }
+    }
+
+    // Define os horários de início e fim para as aplicações
+    serverApps.Start(Seconds(1.0));
+    serverApps.Stop(Seconds(10.0));
+    clientApps.Start(Seconds(2.0));
+    clientApps.Stop(Seconds(10.0));
+
+    // FIM DAS APLICAÇÕES
+
+
+
+
+    // Parte comentada para implementação do tcp, udp e mixer
 
     // Ping ICMPv4 a partir de uma STA
-    uint32_t staIndex = 0;
-    PingHelper ping(s2Addr);
-    ping.SetAttribute("Interval", TimeValue(Seconds(1.0)));
-    auto pingApp = ping.Install(wifiStaNodes.Get(staIndex));
-    pingApp.Start(Seconds(2.0));
-    pingApp.Stop (Seconds(10.0));
+    // uint32_t staIndex = 0;
+    // PingHelper ping(s2Addr);
+    // ping.SetAttribute("Interval", TimeValue(Seconds(1.0)));
+    // auto pingApp = ping.Install(wifiStaNodes.Get(staIndex));
+    // pingApp.Start(Seconds(2.0));
+    // pingApp.Stop (Seconds(10.0));
+
 
     // Janela da simulação
     Simulator::Stop(Seconds(10.0));
