@@ -31,7 +31,6 @@ juntos num único domínio 10.1.1.0. O nó s0 também atua como AP do Wi-Fi.
 #include "ns3/applications-module.h"
 
 // Métricas
-#include "ns3/applications-module.h"
 #include "ns3/flow-monitor-module.h"
 
 using namespace ns3;
@@ -42,10 +41,12 @@ int main(int argc, char *argv[])
     uint32_t nSta = 4; // Numero de clientes Wifi
     std::string dataRate = "100Mbps"; // Taxa de dados
     std::string delay = "2ms"; // Atraso do enlace
+    bool cenarioMovel = false;
 
     CommandLine cmd; 
     cmd.AddValue("nSta", "Number of WiFi clients", nSta );
     cmd.AddValue("protocolo", "Protocolo a ser usado (TCP, UDP, Mixed)", protocolo);
+    cmd.AddValue("cenarioMovel", "Ativa o cenario de mobilidade (true/false)", cenarioMovel); 
     cmd.Parse(argc, argv);
 
     NodeContainer lan; lan.Create(3);       // 0:s2, 1:s1, 2:s0
@@ -80,18 +81,68 @@ int main(int argc, char *argv[])
     addr.SetBase("10.1.1.0", "255.255.255.0");
     Ipv4InterfaceContainer csmaIfaces = addr.Assign(csmaDevices);
 
-    // MobilityHelper mobility;
+    /* 
+    
+    SEÇÃO DE MOBILIDADE
+
+    */ 
+
+    // Mobilidade
+
     MobilityHelper mobility;
 
-    // Posiciona as STAs em grade e o AP parado
-    mobility.SetPositionAllocator("ns3::GridPositionAllocator",
-        "MinX", DoubleValue(0.0), "MinY", DoubleValue(0.0),
-        "DeltaX", DoubleValue(5.0), "DeltaY", DoubleValue(5.0),
-        "GridWidth", UintegerValue(2), "LayoutType", StringValue("RowFirst"));
+    if (cenarioMovel)
+    {
+        // Nós MÓVEIS
+        std::cout << "Iniciando cenário de mobilidade" << std::endl;
+        
+        // Define os limites da área (140m x 140m, como sugerido pelo joahannes no pdf)
+        double bounds = 140.0; 
+        
+        // Define os limites da área para os nós, sendo eles colocados de forma aleatória na área limite
+        Ptr<UniformRandomVariable> varX = CreateObject<UniformRandomVariable>();
+        varX->SetAttribute("Min", DoubleValue(0.0));
+        varX->SetAttribute("Max", DoubleValue(bounds));
+        Ptr<UniformRandomVariable> varY = CreateObject<UniformRandomVariable>();
+        varY->SetAttribute("Min", DoubleValue(0.0));
+        varY->SetAttribute("Max", DoubleValue(bounds));
+        
+        Ptr<RandomRectanglePositionAllocator> posAllocator = CreateObject<RandomRectanglePositionAllocator>();
+        posAllocator->SetX(varX);
+        posAllocator->SetY(varY);
+        mobility.SetPositionAllocator(posAllocator);
 
-    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
-    mobility.Install(wifiStaNodes); // STAs
-    mobility.Install(wifiApNode);   // AP (s0)
+        // O modelo de mobilidade
+        // RandomWalk2dMobilityModel -> andar aleatoriamente
+        mobility.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
+            "Bounds", RectangleValue(Rectangle(0.0, bounds, 0.0, bounds)), // Não sair da área
+            "Time", StringValue("2s"), // Mudar de direção a cada 2s
+            "Speed", StringValue("ns3::UniformRandomVariable[Min=1.0|Max=2.0]")); // 1.0 m/s a 2.0 m/s ou 3.6 km/h a 7.2 km/h
+    }
+    else
+    {
+        // Nós ESTÁTICOS
+        std::cout << "Iniciando cenário de mobilidade estático" << std::endl;
+        
+        mobility.SetPositionAllocator("ns3::GridPositionAllocator",
+            "MinX", DoubleValue(0.0), "MinY", DoubleValue(0.0),
+            "DeltaX", DoubleValue(5.0), "DeltaY", DoubleValue(5.0),
+            "GridWidth", UintegerValue(2), "LayoutType", StringValue("RowFirst"));
+
+        mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    }
+
+    // Instala o modelo (estático OU móvel) nos clientes Wi-Fi
+    mobility.Install(wifiStaNodes);
+
+    // Mobilidade do AP (s0) -> permanecer parado nos dois casos
+    MobilityHelper apMobility;
+    apMobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    apMobility.Install(wifiApNode);
+
+    // FIM DA SEÇÃO MOBILIDADE
+
+
 
     // Montar o Wi-Fi (AP + STAs)
     // Helpers de PHY e Canal (compartilham o mesmo meio rádio)
@@ -145,7 +196,6 @@ int main(int argc, char *argv[])
 
     // Containers para guardar as aplicações (para poder iniciá-las/pará-las)
     ApplicationContainer serverApps;
-    ApplicationContainer clientApps;
 
     if (protocolo == "TCP")
     {
@@ -246,18 +296,11 @@ int main(int argc, char *argv[])
     // FIM DAS APLICAÇÕES
 
 
+    /* 
+    
+    SEÇÃO DE MÉTRICAS (FLOWMONITOR)
 
-
-    // Parte comentada para implementação do tcp, udp e mixer
-
-    // Ping ICMPv4 a partir de uma STA
-    // uint32_t staIndex = 0;
-    // PingHelper ping(s2Addr);
-    // ping.SetAttribute("Interval", TimeValue(Seconds(1.0)));
-    // auto pingApp = ping.Install(wifiStaNodes.Get(staIndex));
-    // pingApp.Start(Seconds(2.0));
-    // pingApp.Stop (Seconds(10.0));
-
+    */ 
 
     // Instalação do FlowMonitor
     Ptr<FlowMonitor> flowMonitor;
@@ -277,62 +320,58 @@ int main(int argc, char *argv[])
     // Estatísticas de todos os fluxos monitorados
     FlowMonitor::FlowStatsContainer stats = flowMonitor->GetFlowStats();
 
-    
+
     double totalDelay = 0;       // Atraso total
     double totalRxBytes = 0;     // Total de bytes recebidos
     uint32_t totalTxPackets = 0; // Total de pacotes enviados
     uint32_t totalRxPackets = 0; // Total de pacotes recebidos
-    double totalDuration = 0;    // Duração total 
+    double totalThroughput = 0.0; // Soma das vazões individuais
+    uint32_t totalFlows = 0;      // Contador de fluxos válidos
 
     // Itera por cada fluxo (ex: c0->s2, c1->s2, etc.)
     for (auto const& [flowId, flowStats] : stats)
     {
         // Apenas considera fluxos que realmente enviaram pacotes
-        if (flowStats.txPackets == 0) continue;
+        if (flowStats.txPackets == 0)
+            continue;
 
-        // Soma as estatísticas de cada fluxo
         totalTxPackets += flowStats.txPackets;
         totalRxPackets += flowStats.rxPackets;
         totalRxBytes += flowStats.rxBytes;
         totalDelay += flowStats.delaySum.GetSeconds();
 
-        // Duração do fluxo (do primeiro envio até a última recepção)
+        // Calcula vazão individual do fluxo
         double duration = flowStats.timeLastRxPacket.GetSeconds() - flowStats.timeFirstTxPacket.GetSeconds();
-        
-        // Se a duração for > 0, soma para a média
         if (duration > 0)
         {
-            totalDuration += duration;
+            // Adiciona a vazão deste fluxo para soma total
+            totalThroughput += (flowStats.rxBytes * 8.0) / (duration * 1024 * 1024);
+            totalFlows++; // Conta como um fluxo válido para a média
         }
     }
 
-    // Médias
 
-    // Média de Atraso 
-    // Atraso total dividido pelo número de pacotes recebidos
-    double mediaAtraso = totalDelay / totalRxPackets;
+    // Média de Atraso (Agregada: Atraso total / Pacotes totais)
+    double mediaAtraso = (totalRxPackets > 0) ? (totalDelay / totalRxPackets) : 0;
 
-    // Vazão Média 
-    // Bytes totais * 8 (para bits) / duração total em segundos
-    // Dividimos por 1024*1024 para obter em Megabits por segundo (Mbps)
-    double vazãoMedia = (totalRxBytes * 8.0) / (totalDuration * 1024 * 1024);
+    // Vazão Média (Média das vazões de cada fluxo)
+    double vazãoMedia = (totalFlows > 0) ? (totalThroughput / totalFlows) : 0;
 
-    // Taxa de Perda de Pacotes
-    // (Pacotes enviados - Pacotes recebidos) / Pacotes enviados
-    double perdaPacotes = (double)(totalTxPackets - totalRxPackets) / totalTxPackets;
+    // Taxa de Perda de Pacotes (Agregada: Perdidos / Enviados)
+    double perdaPacotes =
+        (totalTxPackets > 0) ? ((double)(totalTxPackets - totalRxPackets) / totalTxPackets) : 0;
 
-    
-    // Impressão dos Resultados
-    
+    // Impressão dos resultados
     Simulator::Destroy();
 
-    std::cout << "\nResultados da Simulação \n" << std::endl;
-    std::cout << "Protocolo: " << protocolo << " | Clientes WiFi: " << nSta << std::endl;
-    std::cout << "Vazão Média (Throughput): " << vazãoMedia << " Mbps" << std::endl;
-    std::cout << "Atraso Médio (Delay): " << mediaAtraso * 1000 << " ms" << std::endl; // *1000 para ms
-    std::cout << "Taxa de Perda de Pacotes: " << perdaPacotes * 100 << " %" << std::endl;
-    std::cout << "Total Pacotes Enviados (Tx): " << totalTxPackets << std::endl;
-    std::cout << "Total Pacotes Recebidos (Rx): " << totalRxPackets << std::endl;
+    std::cout << "\nResultados da Simulação" << std::endl;
+    std::cout << "Protocolo: " << protocolo << " | Clientes WiFi: " << nSta
+              << " | Cenário Móvel: " << (cenarioMovel ? "Sim" : "Não") << std::endl;
+    std::cout << "Vazão Média (Throughput): \t" << vazãoMedia << " Mbps" << std::endl;
+    std::cout << "Atraso Médio (Delay): \t\t" << mediaAtraso * 1000 << " ms" << std::endl; // *1000 para ms
+    std::cout << "Taxa de Perda de Pacotes: \t" << perdaPacotes * 100 << " %" << std::endl;
+    std::cout << "Total Pacotes Enviados (Tx): \t" << totalTxPackets << std::endl;
+    std::cout << "Total Pacotes Recebidos (Rx): \t" << totalRxPackets << std::endl;
 
     return 0;
 }
