@@ -30,6 +30,10 @@ juntos num único domínio 10.1.1.0. O nó s0 também atua como AP do Wi-Fi.
 #include "ns3/mobility-module.h"
 #include "ns3/applications-module.h"
 
+// Métricas
+#include "ns3/applications-module.h"
+#include "ns3/flow-monitor-module.h"
+
 using namespace ns3;
 
 int main(int argc, char *argv[])
@@ -161,7 +165,9 @@ int main(int argc, char *argv[])
 
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
-            clientApps.Add(bulkHelper.Install(wifiStaNodes.Get(i)));
+            ApplicationContainer app = bulkHelper.Install(wifiStaNodes.Get(i));
+            app.Start(Seconds(2.0 + i * 0.1)); // Início escalonado dos clientes
+            app.Stop(Seconds(10.0));
         }
     }
     else if (protocolo == "UDP")
@@ -184,7 +190,9 @@ int main(int argc, char *argv[])
 
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
-            clientApps.Add(echoClientHelper.Install(wifiStaNodes.Get(i)));
+            ApplicationContainer app = echoClientHelper.Install(wifiStaNodes.Get(i));
+            app.Start(Seconds(2.0 + i * 0.1)); // Início escalonado dos clientes
+            app.Stop(Seconds(10.0));
         }
     }
     else if (protocolo == "Mixed")
@@ -217,22 +225,23 @@ int main(int argc, char *argv[])
         
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
+            ApplicationContainer app;
             if (i < wifiStaNodes.GetN() / 2) // Primeira metade
             {
-                clientApps.Add(bulkHelper.Install(wifiStaNodes.Get(i)));
+                app = bulkHelper.Install(wifiStaNodes.Get(i));
             }
             else // Segunda metade
             {
-                clientApps.Add(echoClientHelper.Install(wifiStaNodes.Get(i)));
+                app = echoClientHelper.Install(wifiStaNodes.Get(i));
             }
+            app.Start(Seconds(2.0 + i * 0.1)); 
+            app.Stop(Seconds(10.0));
         }
     }
 
     // Define os horários de início e fim para as aplicações
     serverApps.Start(Seconds(1.0));
     serverApps.Stop(Seconds(10.0));
-    clientApps.Start(Seconds(2.0));
-    clientApps.Stop(Seconds(10.0));
 
     // FIM DAS APLICAÇÕES
 
@@ -250,19 +259,80 @@ int main(int argc, char *argv[])
     // pingApp.Stop (Seconds(10.0));
 
 
+    // Instalação do FlowMonitor
+    Ptr<FlowMonitor> flowMonitor;
+    FlowMonitorHelper flowHelper;
+    flowMonitor = flowHelper.InstallAll(); // Instala em todos os nós
+
     // Janela da simulação
     Simulator::Stop(Seconds(10.0));
     Simulator::Run();
+
+
+
+    // Resultados do FlowMonitor
+  
+    flowMonitor->CheckForLostPackets(); 
+
+    // Estatísticas de todos os fluxos monitorados
+    FlowMonitor::FlowStatsContainer stats = flowMonitor->GetFlowStats();
+
+    
+    double totalDelay = 0;       // Atraso total
+    double totalRxBytes = 0;     // Total de bytes recebidos
+    uint32_t totalTxPackets = 0; // Total de pacotes enviados
+    uint32_t totalRxPackets = 0; // Total de pacotes recebidos
+    double totalDuration = 0;    // Duração total 
+
+    // Itera por cada fluxo (ex: c0->s2, c1->s2, etc.)
+    for (auto const& [flowId, flowStats] : stats)
+    {
+        // Apenas considera fluxos que realmente enviaram pacotes
+        if (flowStats.txPackets == 0) continue;
+
+        // Soma as estatísticas de cada fluxo
+        totalTxPackets += flowStats.txPackets;
+        totalRxPackets += flowStats.rxPackets;
+        totalRxBytes += flowStats.rxBytes;
+        totalDelay += flowStats.delaySum.GetSeconds();
+
+        // Duração do fluxo (do primeiro envio até a última recepção)
+        double duration = flowStats.timeLastRxPacket.GetSeconds() - flowStats.timeFirstTxPacket.GetSeconds();
+        
+        // Se a duração for > 0, soma para a média
+        if (duration > 0)
+        {
+            totalDuration += duration;
+        }
+    }
+
+    // Médias
+
+    // Média de Atraso 
+    // Atraso total dividido pelo número de pacotes recebidos
+    double mediaAtraso = totalDelay / totalRxPackets;
+
+    // Vazão Média 
+    // Bytes totais * 8 (para bits) / duração total em segundos
+    // Dividimos por 1024*1024 para obter em Megabits por segundo (Mbps)
+    double vazãoMedia = (totalRxBytes * 8.0) / (totalDuration * 1024 * 1024);
+
+    // Taxa de Perda de Pacotes
+    // (Pacotes enviados - Pacotes recebidos) / Pacotes enviados
+    double perdaPacotes = (double)(totalTxPackets - totalRxPackets) / totalTxPackets;
+
+    
+    // Impressão dos Resultados
+    
     Simulator::Destroy();
 
-    // Seção de impressão dos parâmetros configurados
-    std::cout << "Number of WiFi clients: " << nSta  << std::endl;
-    std::cout << "Protocol: " << protocolo << std::endl;
-    std::cout << "Data Rate LAN: " << dataRate << std::endl;
-    std::cout << "Delay LAN: " << delay << std::endl;
-    std::cout << "csma=" << lan.GetN()
-            << " ap=" << wifiApNode.GetN()
-            << " stas=" << wifiStaNodes.GetN() << std::endl;
+    std::cout << "\nResultados da Simulação \n" << std::endl;
+    std::cout << "Protocolo: " << protocolo << " | Clientes WiFi: " << nSta << std::endl;
+    std::cout << "Vazão Média (Throughput): " << vazãoMedia << " Mbps" << std::endl;
+    std::cout << "Atraso Médio (Delay): " << mediaAtraso * 1000 << " ms" << std::endl; // *1000 para ms
+    std::cout << "Taxa de Perda de Pacotes: " << perdaPacotes * 100 << " %" << std::endl;
+    std::cout << "Total Pacotes Enviados (Tx): " << totalTxPackets << std::endl;
+    std::cout << "Total Pacotes Recebidos (Rx): " << totalRxPackets << std::endl;
 
     return 0;
 }
