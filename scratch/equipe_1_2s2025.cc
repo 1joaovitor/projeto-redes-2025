@@ -42,11 +42,16 @@ int main(int argc, char *argv[])
     std::string dataRate = "100Mbps"; // Taxa de dados
     std::string delay = "2ms"; // Atraso do enlace
     bool cenarioMovel = false;
+    std::string pcapPrefix = "";
+    double simTime = 60.0; //tempo de simulação
+
+    Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(1500)); // Quadro TCP
 
     CommandLine cmd; 
     cmd.AddValue("nSta", "Number of WiFi clients", nSta );
     cmd.AddValue("protocolo", "Protocolo a ser usado (TCP, UDP, Mixed)", protocolo);
-    cmd.AddValue("cenarioMovel", "Ativa o cenario de mobilidade (true/false)", cenarioMovel); 
+    cmd.AddValue("cenarioMovel", "Ativa o cenario de mobilidade (true/false)", cenarioMovel);
+    cmd.AddValue("pcapPrefix", "Prefixo de caminho para arquivos pcap", pcapPrefix); 
     cmd.Parse(argc, argv);
 
     NodeContainer lan; lan.Create(3);       // 0:s2, 1:s1, 2:s0
@@ -66,7 +71,14 @@ int main(int argc, char *argv[])
     // Instalar CSMA na LAN s2–s1–s0
     NetDeviceContainer csmaDevices = csma.Install(lan);  // conecta s2,s1,s0 na mesma LAN
 
-    csma.EnablePcap("lan", csmaDevices.Get(1), true);  // sniffer na LAN para debug
+    if (!pcapPrefix.empty())
+    {
+        csma.EnablePcap(pcapPrefix + "lan", csmaDevices.Get(1), true); 
+    } else {
+        csma.EnablePcap("lan", csmaDevices.Get(1), true); 
+    }
+
+
 
     NodeContainer wifiStaNodes; // Clients Wifi que se conectan a AP
     wifiStaNodes.Create(nSta);
@@ -96,28 +108,32 @@ int main(int argc, char *argv[])
         // Nós MÓVEIS
         std::cout << "Iniciando cenário de mobilidade" << std::endl;
         
-        // Define os limites da área (140m x 140m, como sugerido pelo joahannes no pdf)
-        double bounds = 140.0; 
+        // Define os limites da área 
+        double minBounds = 50.0; 
+        double maxBounds = 90.0; 
+
+        double minStart = minBounds + 0.1;
+        double maxStart = maxBounds - 0.1;
         
-        // Define os limites da área para os nós, sendo eles colocados de forma aleatória na área limite
+        // Coloca os clientes aleatoriamente dentro da área
         Ptr<UniformRandomVariable> varX = CreateObject<UniformRandomVariable>();
-        varX->SetAttribute("Min", DoubleValue(0.0));
-        varX->SetAttribute("Max", DoubleValue(bounds));
+        varX->SetAttribute("Min", DoubleValue(minStart));
+        varX->SetAttribute("Max", DoubleValue(maxStart));
         Ptr<UniformRandomVariable> varY = CreateObject<UniformRandomVariable>();
-        varY->SetAttribute("Min", DoubleValue(0.0));
-        varY->SetAttribute("Max", DoubleValue(bounds));
+        varY->SetAttribute("Min", DoubleValue(minStart));
+        varY->SetAttribute("Max", DoubleValue(maxStart));
         
         Ptr<RandomRectanglePositionAllocator> posAllocator = CreateObject<RandomRectanglePositionAllocator>();
         posAllocator->SetX(varX);
         posAllocator->SetY(varY);
-        mobility.SetPositionAllocator(posAllocator);
+        mobility.SetPositionAllocator(posAllocator); 
 
-        // O modelo de mobilidade
+        // O modelo de mobilidade NUNCA deve sair da área
         // RandomWalk2dMobilityModel -> andar aleatoriamente
         mobility.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
-            "Bounds", RectangleValue(Rectangle(0.0, bounds, 0.0, bounds)), // Não sair da área
+            "Bounds", RectangleValue(Rectangle(minBounds, maxBounds, minBounds, maxBounds)), // Agora coincide!
             "Time", StringValue("2s"), // Mudar de direção a cada 2s
-            "Speed", StringValue("ns3::UniformRandomVariable[Min=1.0|Max=2.0]")); // 1.0 m/s a 2.0 m/s ou 3.6 km/h a 7.2 km/h
+            "Speed", StringValue("ns3::UniformRandomVariable[Min=0.5|Max=1.0]")); 
     }
     else
     {
@@ -125,7 +141,7 @@ int main(int argc, char *argv[])
         std::cout << "Iniciando cenário de mobilidade estático" << std::endl;
         
         mobility.SetPositionAllocator("ns3::GridPositionAllocator",
-            "MinX", DoubleValue(0.0), "MinY", DoubleValue(0.0),
+            "MinX", DoubleValue(65.0), "MinY", DoubleValue(65.0),
             "DeltaX", DoubleValue(5.0), "DeltaY", DoubleValue(5.0),
             "GridWidth", UintegerValue(2), "LayoutType", StringValue("RowFirst"));
 
@@ -135,9 +151,29 @@ int main(int argc, char *argv[])
     // Instala o modelo (estático OU móvel) nos clientes Wi-Fi
     mobility.Install(wifiStaNodes);
 
+    // DEBUG
+    // for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+    // {
+    //     Ptr<MobilityModel> mob = wifiStaNodes.Get(i)->GetObject<MobilityModel>();
+    //     Vector pos = mob->GetPosition();
+    //     std::cout << "Cliente " << i << " posição inicial: (" 
+    //             << pos.x << ", " << pos.y << ")" << std::endl;
+        
+    //     // Calcular distância ao AP (70, 70)
+    //     double dist = sqrt(pow(pos.x - 70.0, 2) + pow(pos.y - 70.0, 2));
+    //     std::cout << "  Distância ao AP: " << dist << " m" << std::endl;
+    // }
+
     // Mobilidade do AP (s0) -> permanecer parado nos dois casos
     MobilityHelper apMobility;
     apMobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+
+    // Posiciona o AP no centro da área
+    Ptr<ListPositionAllocator> apPosAllocator = CreateObject<ListPositionAllocator>();
+    apPosAllocator->Add(Vector(70.0, 70.0, 0.0)); // Posição (x=70, y=70)
+    apMobility.SetPositionAllocator(apPosAllocator);
+
+
     apMobility.Install(wifiApNode);
 
     // FIM DA SEÇÃO MOBILIDADE
@@ -147,9 +183,15 @@ int main(int argc, char *argv[])
     // Montar o Wi-Fi (AP + STAs)
     // Helpers de PHY e Canal (compartilham o mesmo meio rádio)
     YansWifiChannelHelper channel = YansWifiChannelHelper::Default();
-    YansWifiPhyHelper     phy;
-    phy.SetErrorRateModel("ns3::NistErrorRateModel");
-    phy.SetChannel(channel.Create());
+    Ptr<YansWifiChannel> wifiChannel = channel.Create();
+
+    YansWifiPhyHelper phySta; 
+    phySta.SetErrorRateModel("ns3::NistErrorRateModel");
+    phySta.SetChannel(wifiChannel); // Usa o canal criado
+
+    YansWifiPhyHelper phyAp; 
+    phyAp.SetErrorRateModel("ns3::NistErrorRateModel");
+    phyAp.SetChannel(wifiChannel); // Usa o MESMO canal
 
     WifiMacHelper mac;
     Ssid ssid = Ssid("Equipe1");
@@ -163,20 +205,56 @@ int main(int argc, char *argv[])
     // STAs (clientes)
     mac.SetType("ns3::StaWifiMac",
             "Ssid", SsidValue(ssid),
-            "ActiveProbing", BooleanValue(false));
-    NetDeviceContainer staDevs = wifi.Install(phy, mac, wifiStaNodes);
+            "ActiveProbing", BooleanValue(true));
+    NetDeviceContainer staDevs = wifi.Install(phySta, mac, wifiStaNodes);
 
-    // Zniffer no Wi-Fi para debug 
-    phy.EnablePcap("wifi-clients", staDevs);
+    // DEBUG: Verificar associação após 4 segundos (antes das apps iniciarem)
+    // Simulator::Schedule(Seconds(4.0), [staDevs]() {
+    //     std::cout << "\n=== Status de Associação (t=4s) ===" << std::endl;
+    //     for (uint32_t i = 0; i < staDevs.GetN(); ++i)
+    //     {
+    //         Ptr<NetDevice> dev = staDevs.Get(i);
+    //         Ptr<WifiNetDevice> wifiDev = DynamicCast<WifiNetDevice>(dev);
+    //         if (wifiDev)
+    //         {
+    //             Ptr<StaWifiMac> staMac = DynamicCast<StaWifiMac>(wifiDev->GetMac());
+    //             if (staMac && staMac->IsAssociated())
+    //             {
+    //                 std::cout << "Cliente " << i << ": ASSOCIADO ✓" << std::endl;
+    //             }
+    //             else
+    //             {
+    //                 std::cout << "Cliente " << i << ": NÃO ASSOCIADO ✗" << std::endl;
+    //             }
+    //         }
+    //     }
+    //     std::cout << "====================================\n" << std::endl;
+    // });
+
+    // Sniffer no Wi-Fi para debug 
+    if (!pcapPrefix.empty())
+    {
+        phySta.EnablePcap(pcapPrefix + "wifi-clients", staDevs);
+    } else {
+        phySta.EnablePcap("wifi-clients", staDevs);
+    }
 
     // AP (s0)
     mac.SetType("ns3::ApWifiMac", "Ssid", SsidValue(ssid));
-    NetDeviceContainer apDevs  = wifi.Install(phy, mac, wifiApNode);
+    NetDeviceContainer apDevs  = wifi.Install(phyAp, mac, wifiApNode);
 
     // Endereçar o Wi-Fi (192.168.0.0/24)
     addr.SetBase("192.168.0.0", "255.255.255.0");
     Ipv4InterfaceContainer staIfaces = addr.Assign(staDevs);
     Ipv4InterfaceContainer apIfaces  = addr.Assign(apDevs);
+
+    // DEBUG: Verificar se os clientes têm endereços IP válidos
+    // std::cout << "\n=== Endereços IP dos Clientes WiFi ===" << std::endl;
+    // for (uint32_t i = 0; i < staIfaces.GetN(); ++i)
+    // {
+    //     std::cout << "Cliente " << i << ": " << staIfaces.GetAddress(i) << std::endl;
+    // }
+    // std::cout << "===================================\n" << std::endl;
 
     // Rotas entre as sub-redes (s0 roteando LAN↔Wi-Fi)
     Ipv4GlobalRoutingHelper::PopulateRoutingTables();
@@ -216,8 +294,8 @@ int main(int argc, char *argv[])
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
             ApplicationContainer app = bulkHelper.Install(wifiStaNodes.Get(i));
-            app.Start(Seconds(2.0 + i * 0.1)); // Início escalonado dos clientes
-            app.Stop(Seconds(10.0));
+            app.Start(Seconds(5.0 + i * 0.1)); // Início escalonado dos clientes
+            app.Stop(Seconds(simTime - 1.0));
         }
     }
     else if (protocolo == "UDP")
@@ -234,15 +312,15 @@ int main(int argc, char *argv[])
         UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
         
         // Configura o cliente UDP: 1 pacote a cada 0.01s (simulando tráfego)
-        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(1000)); // N° de pacotes
-        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.01))); // Intervalo
-        echoClientHelper.SetAttribute("PacketSize", UintegerValue(1024)); // Tamanho
+        echoClientHelper.SetAttribute("PacketSize", UintegerValue(512)); // 512 bytes
+        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.008))); // 512kbps
+        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(7500)); // (60s / 0.008s)
 
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
             ApplicationContainer app = echoClientHelper.Install(wifiStaNodes.Get(i));
-            app.Start(Seconds(2.0 + i * 0.1)); // Início escalonado dos clientes
-            app.Stop(Seconds(10.0));
+            app.Start(Seconds(5.0 + i * 0.1)); // Início escalonado dos clientes
+            app.Stop(Seconds(simTime - 1.0));
         }
     }
     else if (protocolo == "Mixed")
@@ -269,9 +347,9 @@ int main(int argc, char *argv[])
 
         // Clientes UDP (UdpEcho), mesmos valores do teste exclusivo UDP
         UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
-        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(1000));
-        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.01)));
-        echoClientHelper.SetAttribute("PacketSize", UintegerValue(1024));
+        echoClientHelper.SetAttribute("PacketSize", UintegerValue(512));
+        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.008)));
+        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(7500)); 
         
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
@@ -284,14 +362,14 @@ int main(int argc, char *argv[])
             {
                 app = echoClientHelper.Install(wifiStaNodes.Get(i));
             }
-            app.Start(Seconds(2.0 + i * 0.1)); 
-            app.Stop(Seconds(10.0));
+            app.Start(Seconds(5.0 + i * 0.1));
+            app.Stop(Seconds(simTime - 1.0));
         }
     }
 
     // Define os horários de início e fim para as aplicações
     serverApps.Start(Seconds(1.0));
-    serverApps.Stop(Seconds(10.0));
+    serverApps.Stop(Seconds(simTime + 1.0));
 
     // FIM DAS APLICAÇÕES
 
@@ -308,7 +386,7 @@ int main(int argc, char *argv[])
     flowMonitor = flowHelper.InstallAll(); // Instala em todos os nós
 
     // Janela da simulação
-    Simulator::Stop(Seconds(10.0));
+    Simulator::Stop(Seconds(63.0));
     Simulator::Run();
 
 
@@ -327,10 +405,21 @@ int main(int argc, char *argv[])
     uint32_t totalRxPackets = 0; // Total de pacotes recebidos
     double totalThroughput = 0.0; // Soma das vazões individuais
     uint32_t totalFlows = 0;      // Contador de fluxos válidos
+    Ipv4Address serverIp = csmaIfaces.GetAddress(0);
+    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowHelper.GetClassifier());
 
     // Itera por cada fluxo (ex: c0->s2, c1->s2, etc.)
     for (auto const& [flowId, flowStats] : stats)
     {
+
+        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(flowId);
+
+        // Isso ignora os fluxos de "echo" (UDP) e de "ACK" (TCP)
+        if (t.destinationAddress != serverIp)
+        {
+            continue; // Pula este fluxo (é um ACK ou um Echo de volta)
+        }
+
         // Apenas considera fluxos que realmente enviaram pacotes
         if (flowStats.txPackets == 0)
             continue;
@@ -372,6 +461,18 @@ int main(int argc, char *argv[])
     std::cout << "Taxa de Perda de Pacotes: \t" << perdaPacotes * 100 << " %" << std::endl;
     std::cout << "Total Pacotes Enviados (Tx): \t" << totalTxPackets << std::endl;
     std::cout << "Total Pacotes Recebidos (Rx): \t" << totalRxPackets << std::endl;
+
+    // Linha de Resumo para Script
+    // Esta linha será usada pelo script run_experiments.sh para criar o CSV
+    std::cout << "ResumoCSV," 
+              << protocolo << "," 
+              << nSta << "," 
+              << (cenarioMovel ? "Movel" : "Estatico") << "," 
+              << vazãoMedia << "," 
+              << mediaAtraso * 1000 << "," 
+              << perdaPacotes * 100 
+              << std::endl;
+
 
     return 0;
 }
