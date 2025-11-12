@@ -4,11 +4,11 @@
 NS3_SCRIPT="equipe_1_2s2025"
 
 # Pasta de base para todos os resultados
-BASE_RESULT_DIR="resultados"
-CSV_FILE="$BASE_RESULT_DIR/resultados_finais.csv"
+BASE_RESULT_DIR="resultados3"
+CSV_FILE="$BASE_RESULT_DIR/resultados_finais3.csv"
 
 # --- Listas de Parâmetros ---
-CLIENTS=(1 2 4 8)
+CLIENTS=(1 2 4 8 16 32)
 PROTOCOLS=("TCP" "UDP" "Mixed")
 MOBILITY=("false" "true")
 

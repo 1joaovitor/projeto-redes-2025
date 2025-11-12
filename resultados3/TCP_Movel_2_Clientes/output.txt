@@ -1,0 +1,16 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade (ConstantVelocity, começando perto do AP e indo para longe).
+STA 0 pos=(69.7705,67.6568) velocity=(-0.103375,-1.05525) speed=1.0603 m/s
+STA 1 pos=(64.0445,74.5047) velocity=(-0.867541,0.656206) speed=1.08777 m/s
+Server s2 IP Address: 10.1.1.1
+Protocolo: TCP (OnOff com controle de taxa)
+
+Resultados da Simulação
+Protocolo: TCP | Clientes WiFi: 2 | Cenário Móvel: Sim
+Vazão Média (Throughput): 	0.250291 Mbps
+Atraso Médio (Delay): 		3.21574 ms
+Taxa de Perda de Pacotes: 	2.84024 %
+Total Pacotes Enviados (Tx): 	845
+Total Pacotes Recebidos (Rx): 	821
+ResumoCSV,TCP,2,Movel,0.250291,3.21574,2.84024

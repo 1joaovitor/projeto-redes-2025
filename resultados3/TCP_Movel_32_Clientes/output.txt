@@ -1,0 +1,46 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade (ConstantVelocity, começando perto do AP e indo para longe).
+STA 0 pos=(71.0925,67.4371) velocity=(0.627243,-1.4714) speed=1.59952 m/s
+STA 1 pos=(66.1631,69.5676) velocity=(-1.66425,-0.187536) speed=1.67478 m/s
+STA 2 pos=(72.1141,75.0891) velocity=(0.644424,1.55128) speed=1.6798 m/s
+STA 3 pos=(62.6977,68.3707) velocity=(-1.16371,-0.259642) speed=1.19232 m/s
+STA 4 pos=(63.3209,73.4123) velocity=(-1.01956,0.520892) speed=1.14492 m/s
+STA 5 pos=(74.2513,70.7989) velocity=(1.77466,0.333516) speed=1.80573 m/s
+STA 6 pos=(72.6529,75.9083) velocity=(0.732403,1.63111) speed=1.788 m/s
+STA 7 pos=(67.8256,70.2276) velocity=(-1.94774,0.203849) speed=1.95838 m/s
+STA 8 pos=(69.901,74.1633) velocity=(-0.0287253,1.20811) speed=1.20845 m/s
+STA 9 pos=(66.2025,64.1701) velocity=(-0.661885,-1.01613) speed=1.21269 m/s
+STA 10 pos=(66.9571,63.8003) velocity=(-0.811188,-1.65276) speed=1.8411 m/s
+STA 11 pos=(76.7534,66.5154) velocity=(1.58656,-0.818629) speed=1.78531 m/s
+STA 12 pos=(74.1825,70.7943) velocity=(1.85674,0.352594) speed=1.88992 m/s
+STA 13 pos=(71.9529,65.2187) velocity=(0.393836,-0.964203) speed=1.04154 m/s
+STA 14 pos=(71.5208,74.0571) velocity=(0.670087,1.7876) speed=1.90906 m/s
+STA 15 pos=(75.0152,66.4671) velocity=(1.05271,-0.741575) speed=1.28769 m/s
+STA 16 pos=(72.1804,76.4205) velocity=(0.469349,1.38206) speed=1.45958 m/s
+STA 17 pos=(71.144,68.2754) velocity=(1.01477,-1.52979) speed=1.83576 m/s
+STA 18 pos=(71.7065,75.1288) velocity=(0.615362,1.84943) speed=1.94912 m/s
+STA 19 pos=(70.6467,64.5124) velocity=(0.227843,-1.93342) speed=1.9468 m/s
+STA 20 pos=(69.2726,63.7566) velocity=(-0.219366,-1.88275) speed=1.89549 m/s
+STA 21 pos=(70.8281,63.4266) velocity=(0.143992,-1.14302) speed=1.15206 m/s
+STA 22 pos=(73.7231,70.0996) velocity=(1.6633,0.0444813) speed=1.66389 m/s
+STA 23 pos=(63.3492,66.9755) velocity=(-1.23992,-0.563872) speed=1.36211 m/s
+STA 24 pos=(73.148,66.8395) velocity=(1.05671,-1.06093) speed=1.49741 m/s
+STA 25 pos=(67.0858,76.1445) velocity=(-0.517937,1.09207) speed=1.20866 m/s
+STA 26 pos=(72.5234,75.4186) velocity=(0.82585,1.77339) speed=1.95626 m/s
+STA 27 pos=(63.0701,70.1071) velocity=(-1.37845,0.0213029) speed=1.37862 m/s
+STA 28 pos=(70.431,75.7502) velocity=(0.108329,1.44544) speed=1.4495 m/s
+STA 29 pos=(68.4544,74.0259) velocity=(-0.591136,1.53981) speed=1.64938 m/s
+STA 30 pos=(70.3452,66.0825) velocity=(0.126295,-1.43319) speed=1.43875 m/s
+STA 31 pos=(69.9224,72.3023) velocity=(-0.0389889,1.15639) speed=1.15705 m/s
+Server s2 IP Address: 10.1.1.1
+Protocolo: TCP (OnOff com controle de taxa)
+
+Resultados da Simulação
+Protocolo: TCP | Clientes WiFi: 32 | Cenário Móvel: Sim
+Vazão Média (Throughput): 	0.0900314 Mbps
+Atraso Médio (Delay): 		290.702 ms
+Taxa de Perda de Pacotes: 	25.6721 %
+Total Pacotes Enviados (Tx): 	3050
+Total Pacotes Recebidos (Rx): 	2267
+ResumoCSV,TCP,32,Movel,0.0900314,290.702,25.6721

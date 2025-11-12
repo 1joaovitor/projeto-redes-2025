@@ -1,0 +1,14 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade estático (ConstantPositionMobilityModel).
+Server s2 IP Address: 10.1.1.1
+Protocolo: Misto (50% TCP, 50% UDP)
+
+Resultados da Simulação
+Protocolo: Mixed | Clientes WiFi: 2 | Cenário Móvel: Não
+Vazão Média (Throughput): 	0.385597 Mbps
+Atraso Médio (Delay): 		2.42178 ms
+Taxa de Perda de Pacotes: 	0 %
+Total Pacotes Enviados (Tx): 	8426
+Total Pacotes Recebidos (Rx): 	8426
+ResumoCSV,Mixed,2,Estatico,0.385597,2.42178,0

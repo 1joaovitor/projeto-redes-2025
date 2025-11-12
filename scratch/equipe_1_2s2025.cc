@@ -99,70 +99,107 @@ int main(int argc, char *argv[])
 
     */ 
 
-    // Mobilidade
+    /*
+     MOBILIDADE
+    - AP em (70,70)
+    - Nós móveis começam  perto do AP (distância aleatória pequena)
+    - Velocidade aleatória entre 1.0 e 2.0 m/s (3.6 a 7.2 km/h)
+    - Direção: aponta para longe do AP (AP -> nó)
+    */
 
     MobilityHelper mobility;
 
+    Vector apPosition = Vector(70.0, 70.0, 0.0); // mesma posição do AP que você já coloco
+    
+
     if (cenarioMovel)
     {
-        // Nós MÓVEIS
-        std::cout << "Iniciando cenário de mobilidade" << std::endl;
-        
-        // Define os limites da área 
-        double minBounds = 50.0; 
-        double maxBounds = 90.0; 
+        std::cout << "Iniciando cenário de mobilidade (ConstantVelocity, começando perto do AP e indo para longe)." << std::endl;
 
-        double minStart = minBounds + 0.1;
-        double maxStart = maxBounds - 0.1;
+        // Parâmetros do "próximo ao AP"
+        double minRadius = 2.0;   // distância mínima do AP (m)
+        double maxRadius = 8.0;   // distância máxima do AP (m) -> "perto"
         
-        // Coloca os clientes aleatoriamente dentro da área
-        Ptr<UniformRandomVariable> varX = CreateObject<UniformRandomVariable>();
-        varX->SetAttribute("Min", DoubleValue(minStart));
-        varX->SetAttribute("Max", DoubleValue(maxStart));
-        Ptr<UniformRandomVariable> varY = CreateObject<UniformRandomVariable>();
-        varY->SetAttribute("Min", DoubleValue(minStart));
-        varY->SetAttribute("Max", DoubleValue(maxStart));
-        
-        Ptr<RandomRectanglePositionAllocator> posAllocator = CreateObject<RandomRectanglePositionAllocator>();
-        posAllocator->SetX(varX);
-        posAllocator->SetY(varY);
-        mobility.SetPositionAllocator(posAllocator); 
+        // Velocidade em m/s (3.6 -- 7.2 km/h => 1.0 -- 2.0 m/s)
+        double minSpeed = 1.0;
+        double maxSpeed = 2.0;
 
-        // O modelo de mobilidade NUNCA deve sair da área
-        // RandomWalk2dMobilityModel -> andar aleatoriamente
-        mobility.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
-            "Bounds", RectangleValue(Rectangle(minBounds, maxBounds, minBounds, maxBounds)), // Agora coincide!
-            "Time", StringValue("2s"), // Mudar de direção a cada 2s
-            "Speed", StringValue("ns3::UniformRandomVariable[Min=0.5|Max=1.0]")); 
+        // Position allocator: posições iniciais calculadas manualmente perto do AP
+        Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator>();
+
+        // Geradores aleatórios
+        Ptr<UniformRandomVariable> varAngle  = CreateObject<UniformRandomVariable>();
+        varAngle->SetAttribute("Min", DoubleValue(0.0));
+        varAngle->SetAttribute("Max", DoubleValue(2.0 * M_PI));
+        Ptr<UniformRandomVariable> varRadius = CreateObject<UniformRandomVariable>();
+        varRadius->SetAttribute("Min", DoubleValue(minRadius));
+        varRadius->SetAttribute("Max", DoubleValue(maxRadius));
+
+        // Gerador de velocidade
+        Ptr<UniformRandomVariable> varSpeed = CreateObject<UniformRandomVariable>();
+        varSpeed->SetAttribute("Min", DoubleValue(minSpeed));
+        varSpeed->SetAttribute("Max", DoubleValue(maxSpeed));
+
+        // Preenche a lista de posições iniciais (perto do AP)
+        for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+        {
+            double angle = varAngle->GetValue();
+            double radius = varRadius->GetValue();
+            double x = apPosition.x + radius * std::cos(angle);
+            double y = apPosition.y + radius * std::sin(angle);
+            posAlloc->Add(Vector(x, y, 0.0));
+        }
+        mobility.SetPositionAllocator(posAlloc);
+
+        // Usa ConstantVelocity
+        mobility.SetMobilityModel("ns3::ConstantVelocityMobilityModel");
+        mobility.Install(wifiStaNodes);
+
+        // Agora define velocidade para cada nó: VETOR DIREÇÃO = (pos - ap), normalizado -> multiplica speed aleatório
+        for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
+        {
+            Ptr<ConstantVelocityMobilityModel> mob = wifiStaNodes.Get(i)->GetObject<ConstantVelocityMobilityModel>();
+            Vector pos = mob->GetPosition();
+
+            // vetor do AP para o nó
+            Vector dir = Vector(pos.x - apPosition.x, pos.y - apPosition.y, 0.0);
+
+            // Se por alguma razão dir for zero (muito improvável), escolhe direção aleatória
+            double len = std::sqrt(dir.x*dir.x + dir.y*dir.y);
+            if (len < 1e-9)
+            {
+                double a = varAngle->GetValue();
+                dir = Vector(std::cos(a), std::sin(a), 0.0);
+                len = 1.0;
+            }
+
+            // normaliza
+            dir.x /= len;
+            dir.y /= len;
+
+            // velocidade aleatória no intervalo [minSpeed, maxSpeed]
+            double speed = varSpeed->GetValue();
+
+            Vector velocity = Vector(dir.x * speed, dir.y * speed, 0.0);
+            mob->SetVelocity(velocity);
+
+            // Debug
+            std::cout << "STA " << i << " pos=(" << pos.x << "," << pos.y << ") velocity=("
+                    << velocity.x << "," << velocity.y << ") speed=" << speed << " m/s" << std::endl;
+        }
     }
     else
     {
-        // Nós ESTÁTICOS
-        std::cout << "Iniciando cenário de mobilidade estático" << std::endl;
-        
+        std::cout << "Iniciando cenário de mobilidade estático (ConstantPositionMobilityModel)." << std::endl;
+
         mobility.SetPositionAllocator("ns3::GridPositionAllocator",
             "MinX", DoubleValue(65.0), "MinY", DoubleValue(65.0),
             "DeltaX", DoubleValue(5.0), "DeltaY", DoubleValue(5.0),
             "GridWidth", UintegerValue(2), "LayoutType", StringValue("RowFirst"));
 
         mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+        mobility.Install(wifiStaNodes);
     }
-
-    // Instala o modelo (estático OU móvel) nos clientes Wi-Fi
-    mobility.Install(wifiStaNodes);
-
-    // DEBUG
-    // for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
-    // {
-    //     Ptr<MobilityModel> mob = wifiStaNodes.Get(i)->GetObject<MobilityModel>();
-    //     Vector pos = mob->GetPosition();
-    //     std::cout << "Cliente " << i << " posição inicial: (" 
-    //             << pos.x << ", " << pos.y << ")" << std::endl;
-        
-    //     // Calcular distância ao AP (70, 70)
-    //     double dist = sqrt(pow(pos.x - 70.0, 2) + pow(pos.y - 70.0, 2));
-    //     std::cout << "  Distância ao AP: " << dist << " m" << std::endl;
-    // }
 
     // Mobilidade do AP (s0) -> permanecer parado nos dois casos
     MobilityHelper apMobility;
@@ -172,9 +209,10 @@ int main(int argc, char *argv[])
     Ptr<ListPositionAllocator> apPosAllocator = CreateObject<ListPositionAllocator>();
     apPosAllocator->Add(Vector(70.0, 70.0, 0.0)); // Posição (x=70, y=70)
     apMobility.SetPositionAllocator(apPosAllocator);
-
+    
 
     apMobility.Install(wifiApNode);
+
 
     // FIM DA SEÇÃO MOBILIDADE
 
@@ -192,6 +230,13 @@ int main(int argc, char *argv[])
     YansWifiPhyHelper phyAp; 
     phyAp.SetErrorRateModel("ns3::NistErrorRateModel");
     phyAp.SetChannel(wifiChannel); // Usa o MESMO canal
+
+    // Definir potência de transmissão em dBm (16 dBm)
+    phySta.Set("TxPowerStart", DoubleValue(16.0));
+    phySta.Set("TxPowerEnd",   DoubleValue(16.0));
+    phyAp.Set("TxPowerStart",  DoubleValue(16.0));
+    phyAp.Set("TxPowerEnd",    DoubleValue(16.0));
+
 
     WifiMacHelper mac;
     Ssid ssid = Ssid("Equipe1");
@@ -270,98 +315,104 @@ int main(int argc, char *argv[])
 
     // Definição das portas de cada protocolo
     uint16_t portTcp = 9;   // padrão para o "PacketSink" (TCP)
-    uint16_t portUdp = 10; // Echo (UDP)
+    uint16_t portUdp = 10; // OnOffHelper (UDP)
 
     // Containers para guardar as aplicações (para poder iniciá-las/pará-las)
     ApplicationContainer serverApps;
 
     if (protocolo == "TCP")
     {
-        std::cout << "Iniciando cenário TCP" << std::endl;
+        std::cout << "Protocolo: TCP (OnOff com controle de taxa)" << std::endl;
         
-        // Servidor (nó s2)
-        // Instala o "PacketSink" (receptor TCP) no nó s2 (lan.Get(0))
-        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), portTcp));
+        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", 
+            InetSocketAddress(Ipv4Address::GetAny(), portTcp));
         serverApps.Add(sinkHelper.Install(lan.Get(0)));
 
-        // Clientes (nós c0...cn)
-        // Instala o "BulkSend" (emissor TCP) em todos os clientes
-        BulkSendHelper bulkHelper("ns3::TcpSocketFactory", InetSocketAddress(s2Addr, portTcp));
+        // MUDANÇA: Usar OnOffHelper para controlar taxa (rajadas)
+        OnOffHelper onoffTcp("ns3::TcpSocketFactory", 
+            InetSocketAddress(s2Addr, portTcp));
         
-        // Enviar o máximo de dados possível (0 = ilimitado)
-        bulkHelper.SetAttribute("MaxBytes", UintegerValue(0));
+        // Taxa controlada: 256 kbps por cliente (rajadas)
+        onoffTcp.SetAttribute("DataRate", StringValue("512kbps"));
+        onoffTcp.SetAttribute("PacketSize", UintegerValue(1024));
+        
+        // Padrão de rajada: 500ms ON, 500ms OFF
+        onoffTcp.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=0.5]"));
+        onoffTcp.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0.5]"));
 
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
-            ApplicationContainer app = bulkHelper.Install(wifiStaNodes.Get(i));
-            app.Start(Seconds(5.0 + i * 0.1)); // Início escalonado dos clientes
+            ApplicationContainer app = onoffTcp.Install(wifiStaNodes.Get(i));
+            app.Start(Seconds(5.0 + i * 0.1));
             app.Stop(Seconds(simTime - 1.0));
         }
     }
+   
     else if (protocolo == "UDP")
     {
-        std::cout << "Iniciando cenário UDP" << std::endl;
+        std::cout << "Iniciando cenário UDP (CBR)" << std::endl;
 
-        // Servidor (no nó s2)
-        // Instala o "UdpEchoServer" no s2
-        UdpEchoServerHelper echoServerHelper(portUdp);
-        serverApps.Add(echoServerHelper.Install(lan.Get(0)));
+        // Servidor UDP (PacketSink)
+        PacketSinkHelper sinkHelper("ns3::UdpSocketFactory", 
+                                    InetSocketAddress(Ipv4Address::GetAny(), portUdp));
+        serverApps.Add(sinkHelper.Install(lan.Get(0)));
 
-        // Clientes (nos nós c0...cn) ---
-        // Instala o "UdpEchoClient" 
-        UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
+        // Cliente UDP com OnOff (CBR - Constant Bit Rate)
+        OnOffHelper onoff("ns3::UdpSocketFactory", InetSocketAddress(s2Addr, portUdp));
         
-        // Configura o cliente UDP: 1 pacote a cada 0.01s (simulando tráfego)
-        echoClientHelper.SetAttribute("PacketSize", UintegerValue(512)); // 512 bytes
-        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.008))); // 512kbps
-        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(7500)); // (60s / 0.008s)
+        // Taxa ajustada para cada cliente - 2 Mbps é mais razoável
+        onoff.SetAttribute("DataRate", StringValue("512kbps"));   // 512 kbps
+        onoff.SetAttribute("PacketSize", UintegerValue(512));    // 512 bytes
 
+        // CORREÇÃO: Definir OnTime e OffTime para CBR constante
+        onoff.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1]"));
+        onoff.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0]"));
+        // REMOVER: onoff.SetConstantRate(DataRate("5Mbps")); // Esta linha não existe!
+        
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
-            ApplicationContainer app = echoClientHelper.Install(wifiStaNodes.Get(i));
-            app.Start(Seconds(5.0 + i * 0.1)); // Início escalonado dos clientes
+            ApplicationContainer app = onoff.Install(wifiStaNodes.Get(i));
+            app.Start(Seconds(5.0 + i * 0.1));
             app.Stop(Seconds(simTime - 1.0));
         }
     }
+
     else if (protocolo == "Mixed")
     {
-        std::cout << "Iniciando cenário Misto (50% TCP, 50% UDP)" << std::endl;
+        std::cout << "Protocolo: Misto (50% TCP, 50% UDP)" << std::endl;
 
-        // Servidor (s2)
-        // O servidor precisa rodar os DOIS serviços ao mesmo tempo
-        
-        // Servidor TCP (PacketSink)
-        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), portTcp));
-        serverApps.Add(sinkHelper.Install(lan.Get(0)));
-        
-        // Servidor UDP (UdpEcho)
-        UdpEchoServerHelper echoServerHelper(portUdp);
-        serverApps.Add(echoServerHelper.Install(lan.Get(0)));
+        PacketSinkHelper sinkTcp("ns3::TcpSocketFactory", 
+            InetSocketAddress(Ipv4Address::GetAny(), portTcp));
+        serverApps.Add(sinkTcp.Install(lan.Get(0)));
 
-        // Clientes (c0...cn)
-        // Metade vai usar TCP, metade vai usar UDP
-        
-        // Clientes TCP (BulkSend)
-        BulkSendHelper bulkHelper("ns3::TcpSocketFactory", InetSocketAddress(s2Addr, portTcp));
-        bulkHelper.SetAttribute("MaxBytes", UintegerValue(0));
+        PacketSinkHelper sinkUdp("ns3::UdpSocketFactory", 
+            InetSocketAddress(Ipv4Address::GetAny(), portUdp));
+        serverApps.Add(sinkUdp.Install(lan.Get(0)));
 
-        // Clientes UDP (UdpEcho), mesmos valores do teste exclusivo UDP
-        UdpEchoClientHelper echoClientHelper(s2Addr, portUdp);
-        echoClientHelper.SetAttribute("PacketSize", UintegerValue(512));
-        echoClientHelper.SetAttribute("Interval", TimeValue(Seconds(0.008)));
-        echoClientHelper.SetAttribute("MaxPackets", UintegerValue(7500)); 
+        // TCP com OnOff (rajadas)
+        OnOffHelper onoffTcp("ns3::TcpSocketFactory", 
+            InetSocketAddress(s2Addr, portTcp));
+        onoffTcp.SetAttribute("DataRate", StringValue("512kbps"));
+        onoffTcp.SetAttribute("PacketSize", UintegerValue(1024));
+        onoffTcp.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=0.5]"));
+        onoffTcp.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0.5]"));
+
+        // UDP (mantém igual)
+        OnOffHelper onoff("ns3::UdpSocketFactory", 
+            InetSocketAddress(s2Addr, portUdp));
+        onoff.SetAttribute("DataRate", StringValue("512kbps"));
+        onoff.SetAttribute("PacketSize", UintegerValue(512));
+        onoff.SetAttribute("OnTime", StringValue("ns3::ConstantRandomVariable[Constant=1]"));
+        onoff.SetAttribute("OffTime", StringValue("ns3::ConstantRandomVariable[Constant=0]"));
         
         for (uint32_t i = 0; i < wifiStaNodes.GetN(); ++i)
         {
             ApplicationContainer app;
-            if (i < wifiStaNodes.GetN() / 2) // Primeira metade
-            {
-                app = bulkHelper.Install(wifiStaNodes.Get(i));
-            }
-            else // Segunda metade
-            {
-                app = echoClientHelper.Install(wifiStaNodes.Get(i));
-            }
+            if (i < wifiStaNodes.GetN() / 2) // TCP
+                app = onoffTcp.Install(wifiStaNodes.Get(i)); // <-- MUDOU AQUI
+            else // UDP
+                app = onoff.Install(wifiStaNodes.Get(i));
+            
             app.Start(Seconds(5.0 + i * 0.1));
             app.Stop(Seconds(simTime - 1.0));
         }

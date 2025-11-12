@@ -1,0 +1,14 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade estático (ConstantPositionMobilityModel).
+Server s2 IP Address: 10.1.1.1
+Iniciando cenário UDP (CBR)
+
+Resultados da Simulação
+Protocolo: UDP | Clientes WiFi: 4 | Cenário Móvel: Não
+Vazão Média (Throughput): 	0.434353 Mbps
+Atraso Médio (Delay): 		274.808 ms
+Taxa de Perda de Pacotes: 	15.2329 %
+Total Pacotes Enviados (Tx): 	26922
+Total Pacotes Recebidos (Rx): 	22821
+ResumoCSV,UDP,4,Estatico,0.434353,274.808,15.2329

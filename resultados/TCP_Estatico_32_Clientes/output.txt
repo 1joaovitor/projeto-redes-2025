@@ -1,0 +1,14 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade estático (ConstantPositionMobilityModel).
+Server s2 IP Address: 10.1.1.1
+Protocolo: TCP (OnOff com controle de taxa)
+
+Resultados da Simulação
+Protocolo: TCP | Clientes WiFi: 32 | Cenário Móvel: Não
+Vazão Média (Throughput): 	0.137093 Mbps
+Atraso Médio (Delay): 		337.414 ms
+Taxa de Perda de Pacotes: 	8.17284 %
+Total Pacotes Enviados (Tx): 	10229
+Total Pacotes Recebidos (Rx): 	9393
+ResumoCSV,TCP,32,Estatico,0.137093,337.414,8.17284

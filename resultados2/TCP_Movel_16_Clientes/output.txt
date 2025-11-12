@@ -1,0 +1,30 @@
+[0/2] Re-checking globbed directories...
+ninja: no work to do.
+Iniciando cenário de mobilidade (ConstantVelocity, começando perto do AP e indo para longe).
+STA 0 pos=(68.4785,71.5209) velocity=(-1.01389,1.01352) speed=1.4336 m/s
+STA 1 pos=(66.8827,69.8032) velocity=(-1.94502,-0.122813) speed=1.94889 m/s
+STA 2 pos=(72.5314,75.6194) velocity=(0.454844,1.00969) speed=1.10741 m/s
+STA 3 pos=(68.3177,76.282) velocity=(-0.275279,1.02794) speed=1.06416 m/s
+STA 4 pos=(77.4354,71.1169) velocity=(1.22271,0.183663) speed=1.23643 m/s
+STA 5 pos=(75.7548,71.5773) velocity=(1.54944,0.424665) speed=1.60659 m/s
+STA 6 pos=(67.9397,70.8949) velocity=(-0.974567,0.423322) speed=1.06254 m/s
+STA 7 pos=(74.1161,71.4066) velocity=(1.20534,0.411916) speed=1.27378 m/s
+STA 8 pos=(63.6447,65.7407) velocity=(-1.00392,-0.672828) speed=1.20854 m/s
+STA 9 pos=(73.7722,74.0906) velocity=(0.893634,0.96906) speed=1.3182 m/s
+STA 10 pos=(69.9747,67.3677) velocity=(-0.0153061,-1.58957) speed=1.58964 m/s
+STA 11 pos=(75.1737,73.5145) velocity=(1.62789,1.10583) speed=1.96796 m/s
+STA 12 pos=(72.3526,73.8747) velocity=(0.553612,0.911779) speed=1.06669 m/s
+STA 13 pos=(65.3697,72.7743) velocity=(-1.07939,0.646732) speed=1.25831 m/s
+STA 14 pos=(76.8,71.4944) velocity=(1.68533,0.370383) speed=1.72554 m/s
+STA 15 pos=(65.1463,65.3515) velocity=(-1.17926,-1.12942) speed=1.63286 m/s
+Server s2 IP Address: 10.1.1.1
+Protocolo: TCP (OnOff com controle de taxa)
+
+Resultados da Simulação
+Protocolo: TCP | Clientes WiFi: 16 | Cenário Móvel: Sim
+Vazão Média (Throughput): 	0.155204 Mbps
+Atraso Médio (Delay): 		257.079 ms
+Taxa de Perda de Pacotes: 	14.7653 %
+Total Pacotes Enviados (Tx): 	2770
+Total Pacotes Recebidos (Rx): 	2361
+ResumoCSV,TCP,16,Movel,0.155204,257.079,14.7653
